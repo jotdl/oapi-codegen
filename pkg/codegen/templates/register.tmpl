@@ -11,7 +11,7 @@ func RegisterHandlers(router interface {
                              	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-                             }, si ServerInterface) {
+                             }, si ServerInterface) *ServerInterfaceWrapper {
 {{if .}}
     wrapper := ServerInterfaceWrapper{
         Handler: si,
@@ -19,4 +19,5 @@ func RegisterHandlers(router interface {
 {{end}}
 {{range .}}router.{{.Method}}("{{.Path | swaggerUriToEchoUri}}", wrapper.{{.OperationId}})
 {{end}}
+	return &wrapper
 }
