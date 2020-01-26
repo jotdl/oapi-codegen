@@ -700,7 +700,7 @@ func RegisterHandlers(router interface {
                              	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-                             }, si ServerInterface) {
+                             }, si ServerInterface) *ServerInterfaceWrapper {
 {{if .}}
     wrapper := ServerInterfaceWrapper{
         Handler: si,
@@ -708,6 +708,7 @@ func RegisterHandlers(router interface {
 {{end}}
 {{range .}}router.{{.Method}}("{{.Path | swaggerUriToEchoUri}}", wrapper.{{.OperationId}})
 {{end}}
+	return &wrapper
 }
 `,
 	"request-bodies.tmpl": `{{range .}}{{$opid := .OperationId}}
@@ -733,6 +734,10 @@ type {{.TypeName}} {{.Schema.TypeDecl}}
 	"wrappers.tmpl": `// ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
     Handler ServerInterface
+
+{{if hasSecurity .}}
+    Secure func(ctx echo.Context, provider string, scopes []string, env ...interface{}) error
+{{end}}
 }
 
 {{range .}}{{$opid := .OperationId}}// {{$opid}} converts echo context to params.
@@ -852,6 +857,19 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
 {{end}}{{/* .CookieParams */}}
 
 {{end}}{{/* .RequiresParamObject */}}
+
+{{if .SecurityDefinitions}}
+    if w.Secure != nil {
+    {{ $pathParams := .PathParams }}
+    {{ $requiresParam := .RequiresParamObject}}
+    {{range .SecurityDefinitions}}
+        err = w.Secure(ctx, "{{.ProviderName}}", {{toStringArray .Scopes}}, {{genParamNames $pathParams}}{{if $requiresParam}}, params{{end}})
+        if err != nil {
+            return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
+        }
+    {{end}}
+    }
+{{end}}{{/* .SecurityDefinitions */}}
     // Invoke the callback with all the unmarshalled arguments
     err = w.Handler.{{.OperationId}}(ctx{{genParamNames .PathParams}}{{if .RequiresParamObject}}, params{{end}})
     return err

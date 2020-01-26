@@ -854,6 +854,8 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+
+	Secure func(ctx echo.Context, provider string, scopes []string, env ...interface{}) error
 }
 
 // PostBoth converts echo context to params.
@@ -889,6 +891,15 @@ func (w *ServerInterfaceWrapper) GetJson(ctx echo.Context) error {
 
 	ctx.Set("OpenId.Scopes", []string{"json.read", "json.admin"})
 
+	if w.Secure != nil {
+
+		err = w.Secure(ctx, "OpenId", []string{"json.read", "json.admin"})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
+		}
+
+	}
+
 	// Invoke the callback with all the unmarshalled arguments
 	err = w.Handler.GetJson(ctx)
 	return err
@@ -918,6 +929,15 @@ func (w *ServerInterfaceWrapper) GetJsonWithTrailingSlash(ctx echo.Context) erro
 
 	ctx.Set("OpenId.Scopes", []string{"json.read", "json.admin"})
 
+	if w.Secure != nil {
+
+		err = w.Secure(ctx, "OpenId", []string{"json.read", "json.admin"})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
+		}
+
+	}
+
 	// Invoke the callback with all the unmarshalled arguments
 	err = w.Handler.GetJsonWithTrailingSlash(ctx)
 	return err
@@ -934,7 +954,7 @@ func RegisterHandlers(router interface {
 	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-}, si ServerInterface) {
+}, si ServerInterface) *ServerInterfaceWrapper {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
@@ -948,6 +968,7 @@ func RegisterHandlers(router interface {
 	router.GET("/with_other_response", wrapper.GetOther)
 	router.GET("/with_trailing_slash/", wrapper.GetJsonWithTrailingSlash)
 
+	return &wrapper
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object

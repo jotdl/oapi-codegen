@@ -241,6 +241,16 @@ func stripNewLines(s string) string {
 	return r.Replace(s)
 }
 
+// hasSecurity returns true if there is one operation definition which contains security definitions. Otherwise returns false
+func hasSecurity(ops []OperationDefinition) bool {
+	for _, op := range ops {
+		if len(op.SecurityDefinitions) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // This function map is passed to the template engine, and we can call each
 // function here by keyName from the template code.
 var TemplateFunctions = template.FuncMap{
@@ -261,4 +271,5 @@ var TemplateFunctions = template.FuncMap{
 	"lower":                      strings.ToLower,
 	"title":                      strings.Title,
 	"stripNewLines":              stripNewLines,
+	"hasSecurity":                hasSecurity,
 }

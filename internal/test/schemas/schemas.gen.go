@@ -559,7 +559,7 @@ func RegisterHandlers(router interface {
 	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-}, si ServerInterface) {
+}, si ServerInterface) *ServerInterfaceWrapper {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
@@ -569,6 +569,7 @@ func RegisterHandlers(router interface {
 	router.GET("/issues/41/:1param", wrapper.Issue41)
 	router.GET("/issues/9", wrapper.Issue9)
 
+	return &wrapper
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
