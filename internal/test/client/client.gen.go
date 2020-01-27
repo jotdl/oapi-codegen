@@ -855,7 +855,7 @@ type ServerInterface interface {
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
 
-	Secure func(ctx echo.Context, provider string, scopes []string, env ...interface{}) error
+	secure func(ctx echo.Context, provider string, scopes []string) error
 }
 
 // PostBoth converts echo context to params.
@@ -891,9 +891,9 @@ func (w *ServerInterfaceWrapper) GetJson(ctx echo.Context) error {
 
 	ctx.Set("OpenId.Scopes", []string{"json.read", "json.admin"})
 
-	if w.Secure != nil {
+	if w.secure != nil {
 
-		err = w.Secure(ctx, "OpenId", []string{"json.read", "json.admin"})
+		err = w.secure(ctx, "OpenId", []string{"json.read", "json.admin"})
 		if err != nil {
 			return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
 		}
@@ -929,9 +929,9 @@ func (w *ServerInterfaceWrapper) GetJsonWithTrailingSlash(ctx echo.Context) erro
 
 	ctx.Set("OpenId.Scopes", []string{"json.read", "json.admin"})
 
-	if w.Secure != nil {
+	if w.secure != nil {
 
-		err = w.Secure(ctx, "OpenId", []string{"json.read", "json.admin"})
+		err = w.secure(ctx, "OpenId", []string{"json.read", "json.admin"})
 		if err != nil {
 			return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
 		}
@@ -954,10 +954,13 @@ func RegisterHandlers(router interface {
 	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-}, si ServerInterface) *ServerInterfaceWrapper {
+}, si ServerInterface, options ...HandlerOption) {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
+	}
+	for _, opt := range options {
+		opt(&wrapper)
 	}
 
 	router.POST("/with_both_bodies", wrapper.PostBoth)
@@ -968,10 +971,15 @@ func RegisterHandlers(router interface {
 	router.GET("/with_other_response", wrapper.GetOther)
 	router.GET("/with_trailing_slash/", wrapper.GetJsonWithTrailingSlash)
 
-	return &wrapper
 }
 
-// Base64 encoded, gzipped, json marshaled Swagger object
+type HandlerOption func(wrapper *ServerInterfaceWrapper)
+
+func WithSecurity(guard func(ctx echo.Context, provider string, _ []string) error) HandlerOption {
+	return func(wrapper *ServerInterfaceWrapper) {
+		wrapper.secure = guard
+	}
+} // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
 	"H4sIAAAAAAAC/8xUzY4SQRB+lUnpcWRYvc1RD2ZNFCMkHpBsmp6C7s1Md1tV7GZCeHdTDcgQN8jBNXsh",

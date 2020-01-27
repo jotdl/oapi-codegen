@@ -700,17 +700,26 @@ func RegisterHandlers(router interface {
                              	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
                              	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-                             }, si ServerInterface) *ServerInterfaceWrapper {
+                             }, si ServerInterface, options ...HandlerOption) {
 {{if .}}
     wrapper := ServerInterfaceWrapper{
         Handler: si,
     }
+	for _, opt := range options {
+		opt(&wrapper)
+	}
 {{end}}
 {{range .}}router.{{.Method}}("{{.Path | swaggerUriToEchoUri}}", wrapper.{{.OperationId}})
 {{end}}
-	return &wrapper
 }
-`,
+
+type HandlerOption func(wrapper *ServerInterfaceWrapper)
+
+func WithSecurity(guard func(ctx echo.Context, provider string, _ []string) error) HandlerOption {
+	return func(wrapper *ServerInterfaceWrapper) {
+		wrapper.secure = guard
+	}
+}`,
 	"request-bodies.tmpl": `{{range .}}{{$opid := .OperationId}}
 {{range .Bodies}}
 // {{$opid}}RequestBody defines body for {{$opid}} for application/json ContentType.
@@ -736,7 +745,7 @@ type ServerInterfaceWrapper struct {
     Handler ServerInterface
 
 {{if hasSecurity .}}
-    Secure func(ctx echo.Context, provider string, scopes []string, env ...interface{}) error
+    secure func(ctx echo.Context, provider string, scopes []string) error
 {{end}}
 }
 
@@ -857,13 +866,10 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
 {{end}}{{/* .CookieParams */}}
 
 {{end}}{{/* .RequiresParamObject */}}
-
 {{if .SecurityDefinitions}}
-    if w.Secure != nil {
-    {{ $pathParams := .PathParams }}
-    {{ $requiresParam := .RequiresParamObject}}
+    if w.secure != nil { {{ $pathParams := .PathParams }}{{ $requiresParam := .RequiresParamObject}}
     {{range .SecurityDefinitions}}
-        err = w.Secure(ctx, "{{.ProviderName}}", {{toStringArray .Scopes}}, {{genParamNames $pathParams}}{{if $requiresParam}}, params{{end}})
+        err = w.secure(ctx, "{{.ProviderName}}", {{toStringArray .Scopes}})
         if err != nil {
             return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
         }

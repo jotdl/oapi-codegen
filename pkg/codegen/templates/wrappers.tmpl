@@ -3,7 +3,7 @@ type ServerInterfaceWrapper struct {
     Handler ServerInterface
 
 {{if hasSecurity .}}
-    Secure func(ctx echo.Context, provider string, scopes []string, env ...interface{}) error
+    secure func(ctx echo.Context, provider string, scopes []string) error
 {{end}}
 }
 
@@ -124,13 +124,10 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
 {{end}}{{/* .CookieParams */}}
 
 {{end}}{{/* .RequiresParamObject */}}
-
 {{if .SecurityDefinitions}}
-    if w.Secure != nil {
-    {{ $pathParams := .PathParams }}
-    {{ $requiresParam := .RequiresParamObject}}
+    if w.secure != nil { {{ $pathParams := .PathParams }}{{ $requiresParam := .RequiresParamObject}}
     {{range .SecurityDefinitions}}
-        err = w.Secure(ctx, "{{.ProviderName}}", {{toStringArray .Scopes}}, {{genParamNames $pathParams}}{{if $requiresParam}}, params{{end}})
+        err = w.secure(ctx, "{{.ProviderName}}", {{toStringArray .Scopes}})
         if err != nil {
             return echo.NewHTTPError(http.StatusUnauthorized, fmt.Sprintf("Authentication failed %s", err))
         }

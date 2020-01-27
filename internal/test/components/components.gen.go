@@ -1128,19 +1128,27 @@ func RegisterHandlers(router interface {
 	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-}, si ServerInterface) *ServerInterfaceWrapper {
+}, si ServerInterface, options ...HandlerOption) {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
+	}
+	for _, opt := range options {
+		opt(&wrapper)
 	}
 
 	router.GET("/params_with_add_props", wrapper.ParamsWithAddProps)
 	router.POST("/params_with_add_props", wrapper.BodyWithAddProps)
 
-	return &wrapper
 }
 
-// Base64 encoded, gzipped, json marshaled Swagger object
+type HandlerOption func(wrapper *ServerInterfaceWrapper)
+
+func WithSecurity(guard func(ctx echo.Context, provider string, _ []string) error) HandlerOption {
+	return func(wrapper *ServerInterfaceWrapper) {
+		wrapper.secure = guard
+	}
+} // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
 	"H4sIAAAAAAAC/9xWy27bOhD9FWLuXQp2Hu1GOxdF0RRoGzQBukiMgBFHEVOZVEg6rhDo34shJcuRaVdO",
